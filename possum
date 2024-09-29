@@ -41,7 +41,21 @@ fi
 
 if [ "$1" = '--verify' ]
 then
-    cd "$store_dir"/data || exit 1
+
+    cd "$store_dir" || exit 1
+
+    data_count=$(find data -type f | wc -l)
+    link_count=$(find . ! -path './data/*' -type f | wc -l)
+
+    if [ "$data_count" -ne "$link_count" ]
+    then
+        printf '%s: data count (%d) not equal to link count (%d)\n' \
+            "$0" "$data_count" "$link_count" 1>&2
+        exit 1
+    fi
+
+    cd data || exit 1
+
     find . -type f | sed -E 's~^(.+/)([^/]+)$~\2 \1\2~' | sha512sum -c
     exit 0
 fi
