@@ -45,3 +45,5 @@ then
 fi
 
 rsync -aHv --delete --force "$source_dir"/ "$dest_dir"
+
+exit 0
