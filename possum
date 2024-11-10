@@ -39,7 +39,7 @@ then
 fi
 
 
-if [ "$1" = '--verify' ]
+if [ "$1" = --verify ]
 then
 
     cd "$store_dir" || exit 1
