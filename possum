@@ -73,6 +73,7 @@ fi
 # Make directories writable
 find "$store_dir" -type d -exec chmod 700 '{}' \;
 
+tmp=$(mktemp)
 
 find "$search_dir" -type f ! -empty \
     \( -iname '*.jpg'  \
@@ -81,32 +82,42 @@ find "$search_dir" -type f ! -empty \
     -o -iname '*.mp4'  \
     -o -iname '*.heic' \
     \) \
-    -exec sh -c '
-set -e
-set -u
+    -print0 > "$tmp"
 
-file="$1"
-hash=$(sha512sum "$file" | sed -E "s/^([^ ]+).*/\1/")
-sub_dir=$(printf "%s" "$hash" | cut -c 1-2)
+bad_ch_count=$(wc -l "$tmp" | cut -d ' ' -f 1)
+
+if [ "$bad_ch_count" -ne 0 ]
+then
+    printf '%s: ERROR: File path contains a newline char\n' "$0" 1>&2
+    exit 1
+fi
+
+tmp_nl=$(mktemp)
+< "$tmp" tr '\0' '\n' > "$tmp_nl"
+
+
+
+while IFS='' read -r file
+do
+hash=$(sha512sum "$file" | sed -E 's/^([^ ]+).*/\1/')
+sub_dir=$(printf %s "$hash" | cut -c 1-2)
 
 data_path="$store_dir/data/$sub_dir/$hash"
 
 if [ -e "$data_path" ]
 then
-    printf "Dupe: %s\n" "$file"
-    exit 0
-fi
+    printf 'Dupe: %s\n' "$file"
+else
 
-create_date=$(exiftool -CreateDate "$file" | sed -E "s/Create Date +: //" \
-    | tr ": " "_")
+create_date=$(exiftool -CreateDate "$file" | sed -E 's/Create Date +: //' \
+    | tr ': ' '_')
 
-if [ -z "$create_date" ] || [ "$create_date" = "0000_00_00_00_00_00" ]
+if [ -z "$create_date" ] || [ "$create_date" = 0000_00_00_00_00_00 ]
 then
-    printf "No create date: %s\n" "$file"
-    exit 0
-fi
+    printf 'No create date: %s\n' "$file"
+else
 
-ext=$(printf "%s" "$file" | grep -E -o "[^.]+$" | tr "[:upper:]" "[:lower:]")
+ext=$(printf %s "$file" | grep -E -o '[^.]+$' | tr '[:upper:]' '[:lower:]')
 
 mkdir -p "$store_dir/data/$sub_dir"
 
@@ -116,12 +127,12 @@ chmod 400 "$data_path"~
 mv "$data_path"~ "$data_path"
 
 
-year=$(printf "%s" "$create_date" | cut -c 1-4)
-month=$(printf "%s" "$create_date" | cut -c 6-7)
+year=$(printf %s "$create_date" | cut -c 1-4)
+month=$(printf %s "$create_date" | cut -c 6-7)
 
 mkdir -p "$store_dir/$year/$month"
 
-tie_break=""
+tie_break=''
 num=0
 while true
 do
@@ -134,10 +145,14 @@ do
     tie_break=_"$num"
 done
 
-printf "Done: %s\n" "$file"
+printf 'Done: %s\n' "$file"
 
-' sh '{}' \;
+fi
+fi
+done < "$tmp_nl"
 
 
 # Protect from accidental file deletion
 find "$store_dir" -type d -exec chmod 500 '{}' \;
+
+rm "$tmp" "$tmp_nl"
