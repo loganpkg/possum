@@ -30,7 +30,8 @@ then
     exit 1
 fi
 
-export store_dir="$2"
+store_dir=$(printf '%s' "$2" | sed -E 's_/+$__')
+export store_dir
 
 if [ ! -d "$store_dir" ]
 then
@@ -41,27 +42,27 @@ fi
 
 if [ "$1" = --verify ]
 then
-
     cd "$store_dir" || exit 1
 
-    data_count=$(find data -type f | wc -l)
-    link_count=$(find . ! -path './data/*' -type f | wc -l)
+    hash_count=$(find hash -type f | wc -l)
+    file_count=$(find . ! -path './hash/*' -type f | wc -l)
 
-    if [ "$data_count" -ne "$link_count" ]
+    if [ "$hash_count" -ne "$file_count" ]
     then
-        printf '%s: data count (%d) not equal to link count (%d)\n' \
-            "$0" "$data_count" "$link_count" 1>&2
+        printf '%s: hash count (%d) not equal to file count (%d)\n' \
+            "$0" "$hash_count" "$file_count" 1>&2
         exit 1
     fi
 
-    cd data || exit 1
+    find hash -type f -exec \
+        sh -c 'hash=$(basename "$1"); printf "%s  " "$hash"; cat "$1"' sh '{}' \; \
+        | sha512sum -c
 
-    find . -type f | sed -E 's~^(.+/)([^/]+)$~\2 \1\2~' | sha512sum -c
     exit 0
 fi
 
+search_dir=$(printf '%s' "$1" | sed -E 's_/+$__')
 
-search_dir="$1"
 
 if [ ! -d "$search_dir" ]
 then
@@ -101,9 +102,9 @@ do
     hash=$(sha512sum "$file" | sed -E 's/^([^ ]+).*/\1/')
     sub_dir=$(printf %s "$hash" | cut -c 1-2)
 
-    data_path="$store_dir/data/$sub_dir/$hash"
+    hash_path="$store_dir/hash/$sub_dir/$hash"
 
-    if [ -e "$data_path" ]
+    if [ -e "$hash_path" ]
     then
         printf 'Dupe: %s\n' "$file"
     else
@@ -117,12 +118,7 @@ do
             ext=$(printf %s "$file" | grep -E -o '[^.]+$' \
                 | tr '[:upper:]' '[:lower:]')
 
-            mkdir -p "$store_dir/data/$sub_dir"
-
-            cp "$file" "$data_path"~
-            # Protect file contents
-            chmod 400 "$data_path"~
-            mv "$data_path"~ "$data_path"
+            mkdir -p "$store_dir/hash/$sub_dir"
 
             year=$(printf %s "$create_date" | cut -c 1-4)
             month=$(printf %s "$create_date" | cut -c 6-7)
@@ -133,17 +129,23 @@ do
             num=0
             while true
             do
-                if ln "$data_path" \
-                    "$store_dir/$year/$month/$create_date$tie_break.$ext" \
-                    2> /dev/null
+                target_suffix="$year/$month/$create_date$tie_break.$ext"
+                target="$store_dir/$target_suffix"
+                if [ ! -e "$target" ]
                 then
+                    cp "$file" "$target"~
+                    chmod 400 "$target"~
+                    mv "$target"~ "$target"
+                    printf '%s\n' "$target_suffix" > "$hash_path"~
+                    chmod 400 "$hash_path"~
+                    mv "$hash_path"~ "$hash_path"
                     break
                 fi
                 num=$((num + 1))
                 tie_break=_"$num"
             done
 
-            printf 'Done: %s\n' "$file"
+            printf 'Copied: %s => %s\n' "$file" "$target"
         fi
     fi
 done < "$tmp_nl"
