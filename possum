@@ -1,7 +1,7 @@
 #! /bin/sh
 
 #
-# Copyright (c) 2024 Logan Ryan McLintock
+# Copyright (c) 2024, 2025 Logan Ryan McLintock
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -19,6 +19,7 @@
 
 # possum:
 # Organises photos and videos based on the create date stored inside the media.
+# For my loving wife with her beautiful possum eyes.
 
 set -e
 set -u
@@ -30,7 +31,7 @@ then
     exit 1
 fi
 
-store_dir=$(printf '%s' "$2" | sed -E 's_/+$__')
+store_dir=$(printf '%s' "$2" | sed -E 's~/+$~~')
 export store_dir
 
 if [ ! -d "$store_dir" ]
@@ -54,15 +55,19 @@ then
         exit 1
     fi
 
-    find hash -type f -exec \
-        sh -c 'hash=$(basename "$1"); printf "%s  " "$hash"; cat "$1"' sh '{}' \; \
-        | sha512sum -c
+    find hash -type f -exec sh -c \
+        'set -e
+         set -u
+         fn="$1"
+         printf "$fn" | sed -E "s~^hash/([0-9a-f]{2})/([0-9a-f]+)\.txt$~\1\2  ~"
+         cat "$fn"
+         ' sh '{}' \; | sha512sum -c
 
     exit 0
 fi
 
-search_dir=$(printf '%s' "$1" | sed -E 's_/+$__')
 
+search_dir=$(printf '%s' "$1" | sed -E 's~/+$~~')
 
 if [ ! -d "$search_dir" ]
 then
@@ -99,17 +104,16 @@ tmp_nl=$(mktemp)
 
 while IFS='' read -r file
 do
-    hash=$(sha512sum "$file" | sed -E 's/^([^ ]+).*/\1/')
-    sub_dir=$(printf %s "$hash" | cut -c 1-2)
 
-    hash_path="$store_dir/hash/$sub_dir/$hash"
+    h=$(sha512sum "$file" | sed -E 's~^([0-9a-f]{2})([0-9a-f]+) .*$~\1/\2.txt~')
+    hash_path="$store_dir/hash/$h"
 
     if [ -e "$hash_path" ]
     then
         printf 'Dupe: %s\n' "$file"
     else
         create_date=$(exiftool -CreateDate "$file" \
-            | sed -E 's/Create Date +: //' | tr ': ' '_')
+            | sed -E 's~Create Date +: ~~' | tr ': ' '_')
 
         if [ -z "$create_date" ] || [ "$create_date" = 0000_00_00_00_00_00 ]
         then
@@ -118,7 +122,8 @@ do
             ext=$(printf %s "$file" | grep -E -o '[^.]+$' \
                 | tr '[:upper:]' '[:lower:]')
 
-            mkdir -p "$store_dir/hash/$sub_dir"
+            hash_dir=$(dirname "$hash_path")
+            mkdir -p "$hash_dir"
 
             year=$(printf %s "$create_date" | cut -c 1-4)
             month=$(printf %s "$create_date" | cut -c 6-7)
