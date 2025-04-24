@@ -59,9 +59,9 @@ then
         'set -e
          set -u
          fn="$1"
-         printf "$fn" | sed -E "s~^hash/([0-9a-f]{2})/([0-9a-f]+)\.txt$~\1\2  ~"
+         printf "$fn" | sed -E "s~^hash/([0-9a-f]{2})/([0-9a-f]+)\.txt$~\1\2 ~"
          cat "$fn"
-         ' sh '{}' \; | sha512sum -c
+         ' sh '{}' \; | sort -t ' ' -k 2,2 | sha512sum -c
 
     exit 0
 fi
