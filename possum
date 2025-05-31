@@ -44,25 +44,7 @@ fi
 if [ "$1" = --verify ]
 then
     cd "$store_dir" || exit 1
-
-    hash_count=$(find hash -type f | wc -l)
-    file_count=$(find . ! -path './hash/*' -type f | wc -l)
-
-    if [ "$hash_count" -ne "$file_count" ]
-    then
-        printf '%s: hash count (%d) not equal to file count (%d)\n' \
-            "$0" "$hash_count" "$file_count" 1>&2
-        exit 1
-    fi
-
-    find hash -type f -exec sh -c \
-        'set -e
-         set -u
-         fn="$1"
-         printf "$fn" | sed -E "s~^hash/([0-9a-f]{2})/([0-9a-f]+)\.txt$~\1\2 ~"
-         cat "$fn"
-         ' sh '{}' \; | sort -t ' ' -k 2,2 | sha512sum -c
-
+    find . -type f | sed -E 's~.*_([0-9a-f]+)\..*~\1 \0~' | sha256sum -c
     exit 0
 fi
 
@@ -75,9 +57,6 @@ then
     exit 1
 fi
 
-
-# Make directories writable
-find "$store_dir" -type d -exec chmod 700 '{}' \;
 
 tmp=$(mktemp)
 
@@ -104,59 +83,36 @@ tmp_nl=$(mktemp)
 
 while IFS='' read -r file
 do
+    create_date=$(exiftool -CreateDate "$file" \
+        | sed -E 's~Create Date +: ~~' | tr ': ' '_')
 
-    h=$(sha512sum "$file" | sed -E 's~^([0-9a-f]{2})([0-9a-f]+) .*$~\1/\2.txt~')
-    hash_path="$store_dir/hash/$h"
-
-    if [ -e "$hash_path" ]
+    if [ -z "$create_date" ] || [ "$create_date" = 0000_00_00_00_00_00 ]
     then
-        printf 'Dupe: %s\n' "$file"
+        printf 'No create date: %s\n' "$file"
     else
-        create_date=$(exiftool -CreateDate "$file" \
-            | sed -E 's~Create Date +: ~~' | tr ': ' '_')
+        ext=$(printf %s "$file" | grep -E -o '[^.]+$' \
+            | tr '[:upper:]' '[:lower:]')
 
-        if [ -z "$create_date" ] || [ "$create_date" = 0000_00_00_00_00_00 ]
+        hash=$(sha256sum "$file" | cut -d ' ' -f 1)
+
+        year=$(printf %s "$create_date" | cut -c 1-4)
+        month=$(printf %s "$create_date" | cut -c 6-7)
+
+        mkdir -p "$store_dir/$year/$month"
+
+        target_suffix="$year/$month/$create_date"'_'"$hash.$ext"
+        target="$store_dir/$target_suffix"
+
+        if [ -e "$target" ]
         then
-            printf 'No create date: %s\n' "$file"
+            printf 'Dupe: %s\n' "$file"
         else
-            ext=$(printf %s "$file" | grep -E -o '[^.]+$' \
-                | tr '[:upper:]' '[:lower:]')
-
-            hash_dir=$(dirname "$hash_path")
-            mkdir -p "$hash_dir"
-
-            year=$(printf %s "$create_date" | cut -c 1-4)
-            month=$(printf %s "$create_date" | cut -c 6-7)
-
-            mkdir -p "$store_dir/$year/$month"
-
-            tie_break=''
-            num=0
-            while true
-            do
-                target_suffix="$year/$month/$create_date$tie_break.$ext"
-                target="$store_dir/$target_suffix"
-                if [ ! -e "$target" ]
-                then
-                    cp "$file" "$target"~
-                    chmod 400 "$target"~
-                    mv "$target"~ "$target"
-                    printf '%s\n' "$target_suffix" > "$hash_path"~
-                    chmod 400 "$hash_path"~
-                    mv "$hash_path"~ "$hash_path"
-                    break
-                fi
-                num=$((num + 1))
-                tie_break=_"$num"
-            done
-
+            cp "$file" "$target"~
+            mv "$target"~ "$target"
             printf 'Copied: %s => %s\n' "$file" "$target"
         fi
     fi
 done < "$tmp_nl"
 
-
-# Protect from accidental file deletion
-find "$store_dir" -type d -exec chmod 500 '{}' \;
 
 rm "$tmp" "$tmp_nl"
