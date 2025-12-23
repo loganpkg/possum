@@ -29,7 +29,8 @@ new_revisions=$(mktemp)
 git add --all
 git commit -am new_data
 
-git fast-export --no-data data_edit \
+git fast-export --full-tree --no-data data_edit~1..data_edit \
+    | grep -o -E '^M 100[0-7]{3} [0-9a-f]{40} [0-9a-f]{40}' \
     | grep -o -E '[0-9a-f]{40} [0-9a-f]{40}' \
     | sed -E 's~^([0-9a-f]{40}) ([0-9a-f]{40})$~s/\2/\1/g~' > "$sed_map"
 

@@ -27,6 +27,7 @@ hash_list=$(mktemp)
 git switch --orphan data_edit
 
 git fast-export --no-data "$target_branch" \
+    | grep -o -E '^M 100[0-7]{3} [0-9a-f]{40} ' \
     | grep -o -E '[0-9a-f]{40}' > "$hash_list"
 
 while IFS='' read -r hash
@@ -34,5 +35,8 @@ do
     # shellcheck disable=SC2094
     git cat-file blob "$hash" > "$hash"
 done < "$hash_list"
+
+git add --all
+git commit -am existing_data
 
 printf 'Edit files ... then run load_data.sh\n'
