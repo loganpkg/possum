@@ -16,6 +16,8 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+# A simple script to assist in changing the license of a software project.
+
 set -e
 set -u
 set -x
