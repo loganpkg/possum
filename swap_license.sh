@@ -59,6 +59,10 @@ find . -type f ! -path '*.git/*' ! -name '*_new' -exec sh -c '
     then
         sed -E "s/<YEAR>/$y/" ../"$new_l"/sh_license > "$fn"_new
         tail -n +"$((h + 1))" "$fn" >> "$fn"_new
+    elif [ "$t" = ";" ]
+    then
+        sed -E "s/<YEAR>/$y/" ../"$new_l"/asm_license > "$fn"_new
+        tail -n +"$((h + 1))" "$fn" >> "$fn"_new
     elif printf %s "$t" | grep -E "^((Copyright)|(SPDX))"
     then
         sed -E "s/<YEAR>/$y/" ../"$new_l"/LICENSE > "$fn"_new
