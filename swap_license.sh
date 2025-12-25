@@ -23,7 +23,7 @@ set -u
 set -x
 
 # Existing license height.
-h=26
+h=15
 
 # New license directory.
 new_l=bsd_3
@@ -36,24 +36,32 @@ find . -type f ! -path '*.git/*' ! -name '*_new' -exec sh -c '
     set -x
 
     fn="$1"
-    type=$(head -c 2 "$fn")
 
-    if [ "$type" = "/*" ]
+    y=$(git log --follow --date=format:%Y --pretty=format:%ad -- "$fn" \
+        | sort --uniq | tr "\n" "," | sed -E -e "s/,/, /g" -e "s/, $//")
+
+    t=$(head -n 1 "$fn")
+
+    if [ "$t" = "/*" ]
     then
-        cat ../"$new_l"/c_license > "$fn"_new
+        sed -E "s/<YEAR>/$y/" ../"$new_l"/c_license > "$fn"_new
         tail -n +"$((h + 1))" "$fn" >> "$fn"_new
-    elif [ "$type" = "#!" ]
+    elif printf %s "$t" | grep -E "^#! /"
     then
         head -n 2 "$fn" > "$fn"_new
-        cat ../"$new_l"/sh_license >> "$fn"_new
+        sed -E "s/<YEAR>/$y/" ../"$new_l"/sh_license >> "$fn"_new
         tail -n +"$((2 + h + 1))" "$fn" >> "$fn"_new
-    elif [ "$type" = "::" ]
+    elif [ "$t" = "::" ]
     then
-        cat ../"$new_l"/cmd_license > "$fn"_new
+        sed -E "s/<YEAR>/$y/" ../"$new_l"/cmd_license > "$fn"_new
         tail -n +"$((h + 1))" "$fn" >> "$fn"_new
-    elif [ "$type" = Co ] || [ "$type" = SP ]
+    elif [ "$t" = "#" ]
     then
-        cp ../"$new_l"/LICENSE "$fn"_new
+        sed -E "s/<YEAR>/$y/" ../"$new_l"/sh_license > "$fn"_new
+        tail -n +"$((h + 1))" "$fn" >> "$fn"_new
+    elif printf %s "$t" | grep -E "^((Copyright)|(SPDX))"
+    then
+        sed -E "s/<YEAR>/$y/" ../"$new_l"/LICENSE > "$fn"_new
     fi
     ' sh '{}' \;
 
