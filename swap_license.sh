@@ -51,6 +51,7 @@ find . -type f ! -path '*.git/*' ! -name '*_new' -exec sh -c '
         head -n 2 "$fn" > "$fn"_new
         sed -E "s/<YEAR>/$y/" ../"$new_l"/sh_license >> "$fn"_new
         tail -n +"$((2 + h + 1))" "$fn" >> "$fn"_new
+        chmod 700 "$fn"_new
     elif [ "$t" = "divert(-1)" ]
     then
         head -n 2 "$fn" > "$fn"_new
