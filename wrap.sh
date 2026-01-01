@@ -31,7 +31,6 @@ tmp=$(mktemp)
 sed -E -e 's/\t/    /g' \
        -e 's/\xE2\x80(\x9C|\x9D)/"/g' \
        -e "s/\xE2\x80\x99/'/g" \
-       -e 's/\xC2\xA7//g' \
        -e 's/ +$//' "$1" \
     | tr -d '\0\r' \
     | tr '\n' '\0' \
