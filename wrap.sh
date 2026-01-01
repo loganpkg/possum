@@ -16,7 +16,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-# Wraps text while preserving indent level.
+# Wraps text while preserving the indent level.
 
 set -e
 set -u
