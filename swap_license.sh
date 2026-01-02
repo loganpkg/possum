@@ -35,7 +35,7 @@ set -x
 h=15
 
 # New license directory.
-new_l=bsd_2
+new_l=CDDL-1.1
 
 export h new_l
 
@@ -53,39 +53,39 @@ find . -type f ! -path '*.git/*' ! -name '*_new' -exec sh -c '
 
     if [ "$t" = "/*" ]
     then
-        sed -E "s/<YEAR>/$y/" ../"$new_l"/c_license > "$fn"_new
+        sed -E "s/<YEAR>/$y/" ../"$new_l"/c_header > "$fn"_new
         tail -n +"$((h + 1))" "$fn" >> "$fn"_new
     elif printf %s "$t" | grep -E "^#! /"
     then
         head -n 2 "$fn" > "$fn"_new
-        sed -E "s/<YEAR>/$y/" ../"$new_l"/sh_license >> "$fn"_new
+        sed -E "s/<YEAR>/$y/" ../"$new_l"/sh_header >> "$fn"_new
         tail -n +"$((2 + h + 1))" "$fn" >> "$fn"_new
         chmod 700 "$fn"_new
     elif [ "$t" = "divert(-1)" ]
     then
         head -n 2 "$fn" > "$fn"_new
-        sed -E "s/<YEAR>/$y/" ../"$new_l"/sh_license >> "$fn"_new
+        sed -E "s/<YEAR>/$y/" ../"$new_l"/sh_header >> "$fn"_new
         tail -n +"$((2 + h + 1))" "$fn" >> "$fn"_new
     elif [ "$t" = "::" ]
     then
-        sed -E "s/<YEAR>/$y/" ../"$new_l"/cmd_license > "$fn"_new
+        sed -E "s/<YEAR>/$y/" ../"$new_l"/cmd_header > "$fn"_new
         tail -n +"$((h + 1))" "$fn" >> "$fn"_new
     elif [ "$t" = "#" ]
     then
-        sed -E "s/<YEAR>/$y/" ../"$new_l"/sh_license > "$fn"_new
+        sed -E "s/<YEAR>/$y/" ../"$new_l"/sh_header > "$fn"_new
         tail -n +"$((h + 1))" "$fn" >> "$fn"_new
     elif [ "$t" = ";" ]
     then
-        sed -E "s/<YEAR>/$y/" ../"$new_l"/asm_license > "$fn"_new
+        sed -E "s/<YEAR>/$y/" ../"$new_l"/asm_header > "$fn"_new
         tail -n +"$((h + 1))" "$fn" >> "$fn"_new
     elif [ "$t" = "<!--" ]
     then
         head -n 2 "$fn" > "$fn"_new
-        sed -E "s/<YEAR>/$y/" ../"$new_l"/LICENSE >> "$fn"_new
+        sed -E "s/<YEAR>/$y/" ../"$new_l"/HEADER >> "$fn"_new
         tail -n +"$((h + 1))" "$fn" >> "$fn"_new
     elif printf %s "$t" | grep -E "^((Copyright)|(SPDX))"
     then
-        sed -E "s/<YEAR>/$y/" ../"$new_l"/LICENSE > "$fn"_new
+        cp ../"$new_l"/LICENSE "$fn"_new
     fi
     ' sh '{}' \;
 
@@ -99,3 +99,7 @@ find . -type f ! -path '*.git/*' -name '*_new' -exec sh -c '
     h=$(printf %s "$fn" | sed -E "s/_new$//")
     mv "$fn" "$h"
     ' sh '{}' \;
+
+
+find . -type f ! -path '*.git/*' -exec \
+    sed -i -E 's/2023, 2024, 2025/2023-2025/' '{}' \;
