@@ -32,7 +32,7 @@ set -u
 set -x
 
 # Existing license height.
-h=15
+h=24
 
 # New license directory.
 new_l=CDDL-1.1
