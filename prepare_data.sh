@@ -29,13 +29,23 @@ set -e
 set -u
 set -x
 
-find . -type f ! -path '*.git/*' -name '*.sh' ! -name 'install.sh' \
-    -exec sh -c '
-        set -e
-        set -u
-        set -x
+target_branch=master
 
-        fn="$1"
-        ex=$(printf %s "$fn" | sed -E "s/\.sh$//")
-        cp "$fn" "$HOME/bin/$ex"
-    ' sh '{}' \;
+hash_list=$(mktemp)
+
+git switch --orphan data_edit
+
+git fast-export --no-data "$target_branch" \
+    | grep -o -E '^M 100[0-7]{3} [0-9a-f]{40} ' \
+    | grep -o -E '[0-9a-f]{40}' > "$hash_list"
+
+while IFS='' read -r hash
+do
+    # shellcheck disable=SC2094
+    git cat-file blob "$hash" > "$hash"
+done < "$hash_list"
+
+git add --all
+git commit -am existing_data
+
+printf 'Edit files ... then run load_data.sh\n'

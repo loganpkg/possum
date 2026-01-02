@@ -29,13 +29,31 @@ set -e
 set -u
 set -x
 
-find . -type f ! -path '*.git/*' -name '*.sh' ! -name 'install.sh' \
-    -exec sh -c '
-        set -e
-        set -u
-        set -x
+target_branch=master
 
-        fn="$1"
-        ex=$(printf %s "$fn" | sed -E "s/\.sh$//")
-        cp "$fn" "$HOME/bin/$ex"
-    ' sh '{}' \;
+sed_map=$(mktemp)
+original_revisions=$(mktemp)
+new_revisions=$(mktemp)
+
+git add --all
+git commit -am new_data
+
+git fast-export --full-tree --no-data data_edit~1..data_edit \
+    | grep -o -E '^M 100[0-7]{3} [0-9a-f]{40} [0-9a-f]{40}' \
+    | grep -o -E '[0-9a-f]{40} [0-9a-f]{40}' \
+    | sed -E 's~^([0-9a-f]{40}) ([0-9a-f]{40})$~s/\2/\1/g~' > "$sed_map"
+
+git switch "$target_branch"
+
+git fast-export --no-data "$target_branch" > "$original_revisions"
+
+sed -E -f "$sed_map" "$original_revisions" > "$new_revisions"
+
+git branch -M old_"$target_branch"
+git switch old_"$target_branch"
+< "$new_revisions" git fast-import
+git switch "$target_branch"
+git branch -D old_"$target_branch"
+git branch -D data_edit
+git reflog expire --expire-unreachable=now --all
+git gc --prune=now

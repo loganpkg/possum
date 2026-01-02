@@ -1,7 +1,7 @@
 #! /bin/sh
 
 #
-# Copyright (c) 2025 Logan Ryan McLintock. All rights reserved.
+# Copyright (c) 2024, 2025 Logan Ryan McLintock. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,17 +25,34 @@
 # SUCH DAMAGE.
 #
 
+
+# Mirror:
+# Mirrors the source directory to the destination directory.
+
 set -e
 set -u
-set -x
 
-find . -type f ! -path '*.git/*' -name '*.sh' ! -name 'install.sh' \
-    -exec sh -c '
-        set -e
-        set -u
-        set -x
+if [ "$#" -ne 2 ]
+then
+    printf 'Usage: %s source_dir dest_dir\n' "$0" 1>&2
+    exit 1
+fi
 
-        fn="$1"
-        ex=$(printf %s "$fn" | sed -E "s/\.sh$//")
-        cp "$fn" "$HOME/bin/$ex"
-    ' sh '{}' \;
+source_dir="$1"
+dest_dir="$2"
+
+if [ ! -d "$source_dir" ]
+then
+    printf '%s: Error: source_dir does not exist: %s\n' "$0" "$source_dir" 1>&2
+    exit 1
+fi
+
+if [ ! -d "$dest_dir" ]
+then
+    printf '%s: Error: dest_dir does not exist: %s\n' "$0" "$dest_dir" 1>&2
+    exit 1
+fi
+
+rsync -aHvv --delete --force "$source_dir"/ "$dest_dir"
+
+exit 0
