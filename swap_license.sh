@@ -85,7 +85,7 @@ find . -type f ! -path '*.git/*' ! -name '*_new' -exec sh -c '
         tail -n +"$((h + 1))" "$fn" >> "$fn"_new
     elif printf %s "$t" | grep -E "^((Copyright)|(SPDX))"
     then
-        cp ../"$new_l"/LICENSE "$fn"_new
+        sed -E "s/<YEAR>/$y/" ../"$new_l"/LICENSE > "$fn"_new
     fi
     ' sh '{}' \;
 
