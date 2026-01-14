@@ -35,7 +35,7 @@ set -u
 set -x
 
 # Existing license height.
-h=24
+h=15
 
 # New license directory.
 new_l=bsd_3
