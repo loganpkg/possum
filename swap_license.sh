@@ -106,3 +106,6 @@ find . -type f ! -path '*.git/*' -name '*_new' -exec sh -c '
 
 find . -type f ! -path '*.git/*' -exec \
     sed -i -E 's/2023, 2024, 2025/2023-2025/' '{}' \;
+
+find . -type f ! -path '*.git/*' -exec \
+    sed -i -E 's/2024, 2025, 2026/2024-2026/' '{}' \;
