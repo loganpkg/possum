@@ -35,7 +35,7 @@ set -x
 h=15
 
 # New license directory.
-new_l=bsd_2
+new_l=bsd_3
 
 export h new_l
 
