@@ -1,7 +1,7 @@
 #! /bin/sh
 
 #
-# Copyright (c) 2025 Logan Ryan McLintock. All rights reserved.
+# Copyright (c) 2026 Logan Ryan McLintock. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,19 +28,26 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
+
+# fix_perms: Recursively corrects file permissions.
+
 set -e
 set -u
 set -x
 
-find . -type f ! -path '*.git/*' -name '*.sh' ! -name 'install.sh' \
-    -exec sh -c '
-        set -e
-        set -u
-        set -x
 
-        fn="$1"
-        shellcheck "$fn"
-        chmod 700 "$fn"
-        ex=$(printf %s "$fn" | sed -E "s/\.sh$//")
-        cp -p "$fn" "$HOME/bin/$ex"
-    ' sh '{}' \;
+if [ "$#" -eq 0 ]
+then
+    set '.'
+fi
+
+
+find "$@" -type d ! -path '*.git/*' -exec chmod 700 '{}' \;
+
+find "$@" -type f ! -path '*.git/*' \
+    ! \( -name '*.sh' -o -name '*.exp' -o -name '*.cmd' \) \
+      -exec chmod 600 '{}' \;
+
+find "$@" -type f ! -path '*.git/*' \
+      \( -name '*.sh' -o -name '*.exp' -o -name '*.cmd' \) \
+      -exec chmod 700 '{}' \;

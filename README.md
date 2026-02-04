@@ -74,5 +74,27 @@ The `mirror` script mirrors the source directory to the destination
 directory.
 
 
+fix_perms
+---------
+
+`fix_perms` recursively corrects file permissions.
+
+
+bkup
+----
+
+bkup creates incremental backups using cpdup with hard links.
+You can schedule it using cron by typing `crontab -e` and editing
+the configuration. The example below runs the backup every 5 minutes.
+
+```
+PATH=$HOME/bin:/usr/bin:$PATH
+
+*/5 * * * * bkup /path/to/source_dir /path/to/store_dir >> /path/to/log_file 2>&1
+```
+
+You can type `crontab -l` to view your configuration.
+
+
 Enjoy,
 Logan =)_
