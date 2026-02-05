@@ -88,7 +88,7 @@ You can schedule it using cron by typing `crontab -e` and editing
 the configuration. The example below runs the backup every 5 minutes.
 
 ```
-PATH=$HOME/bin:/usr/bin:$PATH
+PATH=/home/logan/bin:/usr/bin:$PATH
 
 */5 * * * * bkup /path/to/source_dir /path/to/store_dir >> /path/to/log_file 2>&1
 ```

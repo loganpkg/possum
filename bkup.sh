@@ -39,175 +39,169 @@ set -u
 usage='source_dir store_dir'
 
 
-unlock_exit() {
-    rm -f "$store_dir"/LOCK.txt
-    exit "$1"
-}
-
-
-print_error() {
-    {
-        printf '%s: %s: ERROR: ' "$dt" "$$"
-        # shellcheck disable=SC2059
-        printf "$@"
-        printf ': %s\n' "$(date +%Y_%m_%d_%H_%M_%S)"
-    } 1>&2
-}
-
-
-print_success() {
-    printf '%s: %s: SUCCESS: ' "$dt" "$$"
-    # shellcheck disable=SC2059
-    printf "$@"
-    printf ': %s\n' "$(date +%Y_%m_%d_%H_%M_%S)"
-}
-
-
-str_check() {
-    nl_count=$(printf %s "$1" | wc -l)
-    if [ "$nl_count" -ne 0 ]
-    then
-        print_error 'Newline character found in %s' "$1"
-        unlock_exit 1
-    fi
-
-    if printf %s "$1" | grep -E '\|' 1> /dev/null
-    then
-        print_error 'Pipe character found in %s' "$1"
-        unlock_exit 1
-    fi
-}
-
-
-generate_list() {
-    tmp_list=$(mktemp)
-
-    wd=$(pwd)
-    cd "$1" || unlock_exit 1
-    find . -type f -printf '%p\0%s\0%m\0%T@\0\0' > "$tmp_list"
-    cd "$wd" || unlock_exit 1
-
-    tmp_list_check=$(mktemp)
-    < "$tmp_list" tr -d '\n|' > "$tmp_list_check"
-
-    if ! cmp "$tmp_list" "$tmp_list_check" 1> /dev/null
-    then
-        print_error 'Newline or pipe symbol in filename'
-        unlock_exit 1
-    fi
-
-    tmp_list_readable=$(mktemp)
-    sed -E -e 's/\x00\x00/\n/g' -e 's/\x00/|/g' "$tmp_list" \
-        > "$tmp_list_readable"
-
-    tmp_list_sorted=$(mktemp)
-    LC_ALL=C sort -k 1,1 -s "$tmp_list_readable" | sed -E 's/\.[0-9]+$//' \
-        > "$tmp_list_sorted"
-
-    rm "$tmp_list" "$tmp_list_check" "$tmp_list_readable"
-
-    printf '%s\n' "$tmp_list_sorted"
-}
-
-
-dt=$(date +%Y_%m_%d_%H_%M_%S)
-printf '%s: %s: START\n' "$dt" "$$"
+run_id=$(dd if=/dev/urandom bs=200 count=1 2> /dev/null \
+    | tr -dc '[:alnum:]' | cut -c 1-16)
 
 
 if [ "$#" -ne 2 ]
 then
-    print_error '%s %s' "$0" "$usage"
+    printf '%s|%s|ERROR|Usage should be %s %s\n' "$run_id" \
+        "$(date +%Y_%m_%d_%H_%M_%S)" "$0" "$usage" 1>&2
+
     exit 1
 fi
 
 source_dir=$1
 store_dir=$2
 
-
-bn=$(basename "$source_dir")
-
-
-if [ -e "$store_dir" ] && [ ! -d "$store_dir" ]
-then
-    print_error '%s is not a directory' "$store_dir"
-    exit 1
-fi
-
-
 mkdir -p "$store_dir"
 
+export run_id source_dir store_dir
 
-if [ -f "$store_dir"/LOCK.txt ]
-then
-    # Already locked.
-    lock_pid=$(cat "$store_dir"/LOCK.txt)
 
-    if kill -0 "$lock_pid" 2> /dev/null
+(
+    get_date() {
+        date +%Y_%m_%d_%H_%M_%S
+    }
+
+
+    print_error() {
+        {
+            printf '%s|%s|ERROR|' "$run_id" "$(get_date)"
+            # shellcheck disable=SC2059
+            printf "$@"
+            printf '\n'
+        } 1>&2
+    }
+
+
+    print_success() {
+        printf '%s|%s|SUCCESS|' "$run_id" "$(get_date)"
+        # shellcheck disable=SC2059
+        printf "$@"
+        printf '\n'
+    }
+
+
+    str_check() {
+        nl_count=$(printf %s "$1" | wc -l)
+        if [ "$nl_count" -ne 0 ]
+        then
+            print_error 'Newline character found in %s' "$1"
+            exit 1
+        fi
+
+        if printf %s "$1" | grep -E '\|' 1> /dev/null
+        then
+            print_error 'Pipe character found in %s' "$1"
+            exit 1
+        fi
+    }
+
+
+    generate_list() {
+        tmp_list=$(mktemp)
+
+        wd=$(pwd)
+        cd "$1" || exit 1
+        find . -type f -printf '%p\0%s\0%m\0%T@\0\0' > "$tmp_list"
+        cd "$wd" || exit 1
+
+        tmp_list_check=$(mktemp)
+        < "$tmp_list" tr -d '\n|' > "$tmp_list_check"
+
+        if ! cmp "$tmp_list" "$tmp_list_check" 1> /dev/null
+        then
+            print_error 'Newline or pipe symbol in filename'
+            exit 1
+        fi
+
+        tmp_list_readable=$(mktemp)
+        sed -E -e 's/\x00\x00/\n/g' -e 's/\x00/|/g' "$tmp_list" \
+            > "$tmp_list_readable"
+
+        tmp_list_sorted=$(mktemp)
+        LC_ALL=C sort -k 1,1 -s "$tmp_list_readable" | sed -E 's/\.[0-9]+$//' \
+            > "$tmp_list_sorted"
+
+        rm "$tmp_list" "$tmp_list_check" "$tmp_list_readable"
+
+        printf '%s\n' "$tmp_list_sorted"
+    }
+
+
+    dt=$(get_date)
+    printf '%s|%s|INFO|Starting\n' "$run_id" "$dt"
+
+    if flock -n 9
     then
-        # Process is still active.
-        print_error '%s is locked by process %s' "$store_dir" "$lock_pid"
+        printf '%s|%s|INFO|Lock obtained\n' "$run_id" "$(get_date)"
+    else
+        print_error 'Already locked'
         exit 1
     fi
-fi
 
+    str_check "$source_dir"
+    str_check "$store_dir"
 
-# Take the lock.
-printf '%s\n' "$$" > "$store_dir"/LOCK.txt
-
-
-if [ -f "$store_dir"/source_name.txt ]
-then
-    # Check that the source is correct for the store.
-    source_nm=$(cat "$store_dir"/source_name.txt)
-
-    if [ "$source_nm" != "$bn" ]
+    if [ ! -d "$source_dir" ]
     then
-        print_error 'Expecting a source of %s not %s' "$source_nm" "$bn"
-        unlock_exit 1
+        print_error 'Source directory %s does not exist' "$source_dir"
+        exit 1
     fi
-else
-    # New store.
-    printf '%s\n' "$bn" > "$store_dir"/source_name.txt
-fi
 
+    bn=$(basename "$source_dir")
 
-str_check "$source_dir"
-str_check "$store_dir"
-
-
-dest_dir="$store_dir/$dt""_$bn"
-
-if [ -e "$dest_dir"~ ]
-then
-    print_error '%s already exists' "$dest_dir"~
-    unlock_exit 1
-fi
-
-latest=$(find "$store_dir" -mindepth 1 -maxdepth 1 -type d ! -name '*~' \
-    | sort | tail -n 1)
-
-if [ -z "$latest" ]
-then
-    # First backup.
-    cpdup -I "$source_dir" "$dest_dir"~
-    mv "$dest_dir"~ "$dest_dir"
-    print_success 'First'
-else
-    source_list=$(generate_list "$source_dir")
-    latest_list=$(generate_list "$latest")
-
-    if cmp "$source_list" "$latest_list" 1> /dev/null
+    if [ -f "$store_dir"/source_name.txt ]
     then
-        # No changes since last backup.
-        print_success 'No change'
+        # Check that the source is correct for the store.
+        source_nm=$(cat "$store_dir"/source_name.txt)
+
+        if [ "$source_nm" != "$bn" ]
+        then
+            print_error 'Expecting a source of %s not %s' "$source_nm" "$bn"
+            exit 1
+        fi
     else
-        # Incremental.
-        cpdup -I -s0 -i0 -j0 -H "$latest" "$source_dir" "$dest_dir"~
-        mv "$dest_dir"~ "$dest_dir"
-        print_success 'Incremental'
+        # New store.
+        printf '%s\n' "$bn" > "$store_dir"/source_name.txt
     fi
 
-    rm "$source_list" "$latest_list"
-fi
 
-unlock_exit 0
+    dest_dir="$store_dir/$dt""_$bn"
+
+    if [ -e "$dest_dir"~ ]
+    then
+        print_error '%s already exists' "$dest_dir"~
+        exit 1
+    fi
+
+
+    latest=$(find "$store_dir" -mindepth 1 -maxdepth 1 -type d ! -name '*~' \
+        | sort | tail -n 1)
+
+    if [ -z "$latest" ]
+    then
+        # First backup.
+        cpdup -I "$source_dir" "$dest_dir"~
+        mv "$dest_dir"~ "$dest_dir"
+        print_success 'First'
+    else
+        source_list=$(generate_list "$source_dir")
+        latest_list=$(generate_list "$latest")
+
+        if cmp "$source_list" "$latest_list" 1> /dev/null
+        then
+            # No changes since last backup.
+            print_success 'No change'
+        else
+            # Incremental.
+            cpdup -I -s0 -i0 -j0 -H "$latest" "$source_dir" "$dest_dir"~
+            mv "$dest_dir"~ "$dest_dir"
+            print_success 'Incremental'
+        fi
+
+        rm "$source_list" "$latest_list"
+    fi
+
+) 9> "$store_dir"/LOCK
